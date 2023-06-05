@@ -5,9 +5,6 @@ import pandas as pd
 from tqdm import tqdm
 from textSummarizer.entity import ModelEvaluationConfig
 
-
-
-
 class ModelEvaluation:
     def __init__(self, config: ModelEvaluationConfig):
         self.config = config

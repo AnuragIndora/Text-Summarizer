@@ -24,7 +24,7 @@ class DataTransformationConfig:
     data_path: Path
     tokenizer_name: Path
 
-# Model Training
+# Model Trainer
 @dataclass(frozen=True)
 class ModelTrainerConfig:
     root_dir: Path
@@ -40,7 +40,7 @@ class ModelTrainerConfig:
     save_steps: float
     gradient_accumulation_steps: int
 
-# model evaluation
+# Model Evaluation
 @dataclass(frozen=True)
 class ModelEvaluationConfig:
     root_dir: Path
