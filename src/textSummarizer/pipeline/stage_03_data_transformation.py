@@ -1,6 +1,6 @@
-from textSummarizer.config.configration import ConfigurationManager
-from textSummarizer.components.data_transformation import DataTransformation
-from textSummarizer.logging import logger
+from src.textSummarizer.config.configration import ConfigurationManager
+from src.textSummarizer.components.data_transformation import DataTransformation
+from src.textSummarizer.logging import logger
 
 
 class DataTransformationTrainingPipeline:
@@ -8,7 +8,7 @@ class DataTransformationTrainingPipeline:
         pass
 
     def main(self):
-        config = ConfigurationManager()
-        data_transformation_config = config.get_data_transformation_config()
+        config_manager = ConfigurationManager()
+        data_transformation_config = config_manager.get_data_transformation_config()
         data_transformation = DataTransformation(config=data_transformation_config)
-        data_transformation.convert()
+        data_transformation.transform()

@@ -1,51 +1,83 @@
-from transformers import TrainingArguments, Trainer
-from transformers import DataCollatorForSeq2Seq
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from datasets import load_dataset, load_from_disk
-from textSummarizer.entity import ModelTrainerConfig
+from logging import getLogger
+from pathlib import Path
+from dataclasses import dataclass
+from transformers import (
+    BartForConditionalGeneration,
+    BartTokenizer,
+    Seq2SeqTrainingArguments,
+    Seq2SeqTrainer,
+    DataCollatorForSeq2Seq,
+)
+from src.textSummarizer.entity import (ModelTrainerConfig)
 import torch
-import os
+from datasets import load_from_disk
+from src.textSummarizer.constants import *
+
+logger = getLogger(__name__)
 
 class ModelTrainer:
     def __init__(self, config: ModelTrainerConfig):
         self.config = config
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Training on: {self.device} (VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB)")
 
+    def get_model(self):
+        """Load BART with gradient checkpointing for memory efficiency"""
+        model = BartForConditionalGeneration.from_pretrained(
+            self.config.model_name,
+            gradient_checkpointing=self.config.gradient_checkpointing
+        )
+        model = model.to(self.device)
+        if self.config.gradient_checkpointing:
+            logger.info("Gradient Checkpointing enabled (slower, but saves VRAM)")
+        return model
 
-    
+    def get_tokenizer(self):
+        """Load tokenizer"""
+        return BartTokenizer.from_pretrained(self.config.tokenizer_name)
+
+    def load_datasets(self):
+        """Load tokenized datasets from disk"""
+        train_path = Path(self.config.data_path) / "transformed_train_data"
+        val_path = Path(self.config.data_path) / "transformed_validation_data"
+        train_dataset = load_from_disk(train_path)
+        val_dataset = load_from_disk(val_path)
+        logger.info(f"Train: {len(train_dataset)} samples | Val: {len(val_dataset)}")
+        return train_dataset, val_dataset
+
     def train(self):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        tokenizer = AutoTokenizer.from_pretrained(self.config.model_ckpt)
-        model_pegasus = AutoModelForSeq2SeqLM.from_pretrained(self.config.model_ckpt).to(device)
-        seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
-        
-        #loading data 
-        dataset_samsum_pt = load_from_disk(self.config.data_path)
+        """Optimized training loop for 4GB GPU"""
+        model = self.get_model()
+        tokenizer = self.get_tokenizer()
+        train_dataset, val_dataset = self.load_datasets()
 
-        # trainer_args = TrainingArguments(
-        #     output_dir=self.config.root_dir, num_train_epochs=self.config.num_train_epochs, warmup_steps=self.config.warmup_steps,
-        #     per_device_train_batch_size=self.config.per_device_train_batch_size, per_device_eval_batch_size=self.config.per_device_train_batch_size,
-        #     weight_decay=self.config.weight_decay, logging_steps=self.config.logging_steps,
-        #     evaluation_strategy=self.config.evaluation_strategy, eval_steps=self.config.eval_steps, save_steps=1e6,
-        #     gradient_accumulation_steps=self.config.gradient_accumulation_steps
-        # ) 
+        training_args = Seq2SeqTrainingArguments(
+            output_dir=self.config.root_dir,
+            per_device_train_batch_size=self.config.per_device_train_batch_size,
+            per_device_eval_batch_size=self.config.per_device_eval_batch_size,
+            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
+            num_train_epochs=self.config.num_train_epochs,
+            fp16=self.config.fp16,     # 🟠 Mixed Precision (4GB GPU requirement)
+            logging_steps=100,
+            eval_strategy="steps",
+            save_total_limit=2,
+            report_to="none",  # Disable WandB to save memory
+        )
 
+        trainer = Seq2SeqTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=val_dataset,
+            processing_class=tokenizer,
+            data_collator=DataCollatorForSeq2Seq(tokenizer, model=model),
+        )
 
-        trainer_args = TrainingArguments(
-            output_dir=self.config.root_dir, num_train_epochs=1, warmup_steps=500,
-            per_device_train_batch_size=1, per_device_eval_batch_size=1,
-            weight_decay=0.01, logging_steps=10,
-            evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
-            gradient_accumulation_steps=16
-        ) 
-
-        trainer = Trainer(model=model_pegasus, args=trainer_args,
-                  tokenizer=tokenizer, data_collator=seq2seq_data_collator,
-                  train_dataset=dataset_samsum_pt["test"], 
-                  eval_dataset=dataset_samsum_pt["validation"])
-        
+        logger.info("Starting training (VRAM optimized)")
         trainer.train()
 
-        ## Save model
-        model_pegasus.save_pretrained(os.path.join(self.config.root_dir,"pegasus-samsum-model"))
-        ## Save tokenizer
-        tokenizer.save_pretrained(os.path.join(self.config.root_dir,"tokenizer"))
+        # Save the model
+        output_dir = Path(self.config.root_dir) / "final_model"
+        model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        logger.info(f"Model saved to {output_dir}")
