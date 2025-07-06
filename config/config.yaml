@@ -1,40 +1,46 @@
 artifacts_root: artifacts
 
-
 data_ingestion:
   root_dir: artifacts/data_ingestion
-  source_URL: https://github.com/entbappy/Branching-tutorial/raw/master/summarizer-data.zip
-  local_data_file: artifacts/data_ingestion/data.zip
-  unzip_dir: artifacts/data_ingestion
-
-
+  dataset_name: abisee/cnn_dailymail
+  dataset_version: "3.0.0"
+  local_data_dir: artifacts/data_ingestion/cnn_dailymail_data
 
 data_validation:
   root_dir: artifacts/data_validation
+  dataset_dir: artifacts/data_ingestion/cnn_dailymail_data
   STATUS_FILE: artifacts/data_validation/status.txt
-  ALL_REQUIRED_FILES: ["train", "test", "validation"]
-
-
+  REQUIRED_FILES: ["train.csv", "validation.csv", "test.csv"]
+  DATA_FORMATS: ["article", "highlights"]
 
 data_transformation:
   root_dir: artifacts/data_transformation
-  data_path: artifacts/data_ingestion/samsum_dataset
-  tokenizer_name: google/pegasus-cnn_dailymail
-
-
-
+  dataset_dir: artifacts/data_ingestion/cnn_dailymail_data
+  model_name: facebook/bart-base
+  tokenizer_name: facebook/bart-base
+  max_input_length: 1024
+  max_target_length: 256
 
 model_trainer:
   root_dir: artifacts/model_trainer
-  data_path: artifacts/data_transformation/samsum_dataset
-  model_ckpt: google/pegasus-cnn_dailymail
-
-
-
+  data_path: artifacts/data_transformation
+  model_name: facebook/bart-base
+  tokenizer_name: facebook/bart-base
+  num_train_epochs: 3
+  learning_rate: 5e-5
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  weight_decay: 0.01
+  save_total_limit: 2
+  logging_steps: 100
+  save_steps: 500
+  warmup_steps: 500
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: True
 
 model_evaluation:
   root_dir: artifacts/model_evaluation
-  data_path: artifacts/data_transformation/samsum_dataset
-  model_path: artifacts/model_trainer/pegasus-samsum-model
-  tokenizer_path: artifacts/model_trainer/tokenizer
-  metric_file_name: artifacts/model_evaluation/metrics.csv
+  data_path: artifacts/data_transformation
+  model_path: artifacts/model_trainer/final_model
+  tokenizer_path: artifacts/model_trainer/final_model
+  metric_file_name: evaluation_metrics.csv

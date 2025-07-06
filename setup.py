@@ -1,27 +1,44 @@
-import setuptools
+import os
+from pathlib import Path
+import logging
 
-with open("README.md", "r", encoding="utf-8") as f:
-    long_description = f.read()
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] :  %(message)s:')
 
-__version__ = "0.0.0.0"
+project_name = "textSummarizer"
 
-REPO_NAME = "Text-Summarizer"
-AUTHOR_USER_NAME = "AnuragIndora"
-SRC_REPO = "Text-Summarizer"
-AUTHOR_EMAIL = "anuragindora474@gmail.com"
+list_of_files = [
+    ".github/worlflows/.gitkeep",
+    f"src/{project_name}/__init__.py",
+    f"src/{project_name}/components/__init__.py",
+    f"src/{project_name}/utils/__init__.py",
+    f"src/{project_name}/utils/common.py",
+    f"src/{project_name}/logging/__init__.py",
+    f"src/{project_name}/config/__init__.py",
+    f"src/{project_name}/config/configration.py",
+    f"src/{project_name}/pipeline/__init__.py",
+    f"src/{project_name}/entity/__init__.py",
+    f"src/{project_name}/constants/__init__.py",
+    "config/config.yaml",
+    "params.yaml",
+    "app.py",
+    "main.py",
+    "Dockerfile",
+    "requirements.txt",
+    "setup.py",
+    "research/trails.ipynb"
+]
 
-setuptools.setup(
-    name=SRC_REPO,
-    version=__version__,
-    author=AUTHOR_USER_NAME,
-    author_email=AUTHOR_EMAIL,
-    description="Text-Summarizer using NLP library",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url=f"https://github.com/{AUTHOR_USER_NAME}/{REPO_NAME}",
-    project_urls={
-        "Bug Tracker": f"https://github.com/{AUTHOR_USER_NAME}/{REPO_NAME}/issues",
-    },
-    package_dir={"": "src"},
-    packages=setuptools.find_packages(where="src")
-)
+for filepath in list_of_files:
+    filepath = Path(filepath)   # make sure to avoid the path
+    filedir, filename = os.path.split(filepath) # using to split the path to avoid
+
+    if filedir != "":
+        os.makedirs(filedir, exist_ok=True)
+        logging.info(f"Created directory: {filedir} for the file {filename}")
+
+    if (not os.path.exists(filepath) or (os.path.getsize(filepath) == 0)):
+        with open(filepath, 'w') as f:
+            pass
+            logging.info(f"Created empty file: {filepath}")
+    else:
+        logging.info(f"File already exists: {filepath}")
